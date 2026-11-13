@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [ main, master ]
+concurrency:
+  group: android-apk-build
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -17,6 +20,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Verify Android theme resource
+        run: test -f app/src/main/res/values/styles.xml && grep -q 'Theme.PhotonAINews' app/src/main/res/values/styles.xml
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
