@@ -157,7 +157,7 @@ object NewsRepository {
                                 items += NewsItem(
                                     id = id,
                                     title = cleanTitle,
-                                    summary = cleanSummary.ifBlank { "Краткое описание отсутствует в RSS. Откройте первоисточник для деталей." },
+                                    summary = cleanSummary,
                                     url = link,
                                     source = feed.name,
                                     publishedAt = published,
@@ -261,11 +261,10 @@ object NewsRepository {
      */
     private fun applyRussianTerminology(value: String): String {
         val replacements = listOf(
-            Regex("машинное обучение", RegexOption.IGNORE_CASE) to "машинное обучение",
-            Regex("большая языковая модель", RegexOption.IGNORE_CASE) to "большая языковая модель",
-            Regex("искусственный интеллект", RegexOption.IGNORE_CASE) to "искусственный интеллект",
-            Regex("открытый исходный код", RegexOption.IGNORE_CASE) to "открытый исходный код",
-            Regex("генеративный искусственный интеллект", RegexOption.IGNORE_CASE) to "генеративный ИИ"
+            Regex("машинный интеллект", RegexOption.IGNORE_CASE) to "искусственный интеллект",
+            Regex("генеративный искусственный интеллект", RegexOption.IGNORE_CASE) to "генеративный ИИ",
+            Regex("языковые модели большого размера", RegexOption.IGNORE_CASE) to "большие языковые модели",
+            Regex("открытый код", RegexOption.IGNORE_CASE) to "открытый исходный код"
         )
         return replacements.fold(value) { text, (pattern, replacement) -> pattern.replace(text, replacement) }
     }
