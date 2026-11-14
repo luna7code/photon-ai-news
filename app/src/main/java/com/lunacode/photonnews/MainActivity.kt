@@ -439,16 +439,6 @@ private fun EmptyState(title: String) {
 @Composable
 private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
     val context = LocalContext.current
-    var showDraft by remember(event.id) { mutableStateOf(false) }
-    var draft by remember(event.id) { mutableStateOf<EditorialDraft?>(null) }
-    var draftLoading by remember(event.id) { mutableStateOf(false) }
-    LaunchedEffect(showDraft, event) {
-        if (showDraft && draft == null) {
-            draftLoading = true
-            draft = withContext(Dispatchers.Default) { EditorialComposer.compose(event) }
-            draftLoading = false
-        }
-    }
     Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(item.source.uppercase(Locale.ROOT), color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
@@ -492,6 +482,16 @@ private fun EventCard(
     showImpact: Boolean
 ) {
     val context = LocalContext.current
+    var showDraft by remember(event.id) { mutableStateOf(false) }
+    var draft by remember(event.id) { mutableStateOf<EditorialDraft?>(null) }
+    var draftLoading by remember(event.id) { mutableStateOf(false) }
+    LaunchedEffect(showDraft, event) {
+        if (showDraft && draft == null) {
+            draftLoading = true
+            draft = withContext(Dispatchers.Default) { EditorialComposer.compose(event) }
+            draftLoading = false
+        }
+    }
     Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
