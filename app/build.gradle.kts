@@ -13,6 +13,22 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+        ndk { abiFilters += "arm64-v8a" }
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "com/sun/jna/aix-ppc/**",
+                "com/sun/jna/aix-ppc64/**",
+                "com/sun/jna/darwin-aarch64/**",
+                "com/sun/jna/darwin-x86-64/**",
+                "com/sun/jna/win32-aarch64/**",
+                "com/sun/jna/win32-x86-64/**",
+                "com/sun/jna/win32-x86/**",
+                "native/lib/osx-aarch64/**",
+                "native/lib/win-x86_64/**"
+            )
+        }
     }
     buildFeatures { compose = true }
     compileOptions {
