@@ -6,6 +6,8 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
@@ -43,18 +45,23 @@ object NewsRepository {
 
     suspend fun fetchImportant(): List<NewsItem> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        val candidates = feeds.flatMap { feed ->
-            runCatching { parseFeed(feed) }.getOrDefault(emptyList())
-        }
+        // Fetch publishers concurrently; a failing feed must not block the others.
+        val candidates = feeds.map { feed ->
+            async { runCatching { parseFeed(feed) }.getOrDefault(emptyList()) }
+        }.awaitAll().flatten()
             .filter { it.publishedAt > 0L && it.publishedAt <= now + DAY_MS && it.publishedAt >= now - MAX_AGE_DAYS * DAY_MS }
             .filter { it.title.length >= 18 && it.url.startsWith("https://") }
             .distinctBy { canonicalUrl(it.url) }
             .sortedWith(compareByDescending<NewsItem> { it.score }.thenByDescending { it.publishedAt })
 
-        // Remove near-identical headlines even when publishers use different URLs.
+        // Suppress repeated headlines from the same publisher, but retain cross-publisher
+        // coverage so NewsIntelligence can measure corroboration across distinct publishers.
         val unique = mutableListOf<NewsItem>()
         for (candidate in candidates) {
-            if (unique.none { headlineSimilarity(it.title, candidate.title) >= 0.82 }) {
+            if (unique.none {
+                    it.source == candidate.source &&
+                        headlineSimilarity(it.title, candidate.title) >= 0.82
+                }) {
                 unique += candidate
             }
         }
@@ -108,6 +115,7 @@ object NewsRepository {
             setRequestProperty("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml")
         }
         try {
+            if (connection.responseCode !in 200..299) return emptyList()
             connection.inputStream.use { input ->
                 val parser = Xml.newPullParser().apply {
                     setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -151,7 +159,7 @@ object NewsRepository {
                             val cleanTitle = cleanText(title)
                             val cleanSummary = cleanText(description).take(MAX_SUMMARY_CHARS)
                             val published = parseDate(date)
-                            if (cleanTitle.isNotBlank() && link.startsWith("http") && published > 0L) {
+                            if (cleanTitle.isNotBlank() && isValidArticleUrl(link) && published > 0L) {
                                 val score = significanceScore(cleanTitle, cleanSummary, feed.authority)
                                 val id = sha256(canonicalUrl(link))
                                 items += NewsItem(
@@ -161,7 +169,8 @@ object NewsRepository {
                                     url = link,
                                     source = feed.name,
                                     publishedAt = published,
-                                    score = score
+                                    score = score,
+                                    category = categoryFor(cleanTitle, cleanSummary)
                                 )
                             }
                             insideItem = false
@@ -223,6 +232,24 @@ object NewsRepository {
         if (headline.length < 35) score -= 1
         return score
     }
+
+    private fun categoryFor(title: String, summary: String): String {
+        val text = normalize("${title} ${summary}")
+        fun hasAny(vararg terms: String) = terms.any { text.contains(it) }
+        return when {
+            hasAny("safety", "alignment", "security", "cybersecurity", "privacy", "red team", "безопасност", "киберзащит", "приватност", "выравнивание") -> "SAFETY"
+            hasAny("regulation", "regulatory", "legislation", "lawmakers", "policy", "регулирован", "законодатель", "закон", "государственн") -> "POLICY"
+            hasAny("research", "paper", "study", "benchmark", "dataset", "arxiv", "исследован", "научн", "статья", "бенчмарк", "датасет") -> "RESEARCH"
+            hasAny("funding", "investment", "acquisition", "acquires", "partnership", "valuation", "финансирован", "инвестиц", "приобр", "партнерств") -> "BUSINESS"
+            hasAny("launch", "launched", "release", "released", "introduces", "announces", "model", "gpt", "gemini", "claude", "llama", "запуст", "представ", "выпуст", "модель", "релиз") -> "PRODUCT"
+            else -> "OTHER"
+        }
+    }
+
+    private fun isValidArticleUrl(raw: String): Boolean = runCatching {
+        val uri = URI(raw.trim())
+        uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank() && uri.userInfo == null
+    }.getOrDefault(false)
 
     private fun parseDate(raw: String): Long {
         val value = raw.trim()

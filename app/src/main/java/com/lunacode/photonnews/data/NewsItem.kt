@@ -7,5 +7,7 @@ data class NewsItem(
     val url: String,
     val source: String,
     val publishedAt: Long,
-    val score: Int
+    val score: Int,
+    val category: String = "OTHER",
+    val isSaved: Boolean = false
 )

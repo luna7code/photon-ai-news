@@ -1,26 +1,32 @@
-# PHOTON AI NEWS — Android app (v1.0.0 source build)
+# PHOTON AI NEWS — Android app
 
-A Russian-language Android RSS reader for significant AI developments. The app uses a black/white editorial interface, local news history, manual refresh, and a 24-hour background sync.
+A Russian-language Android news reader focused on significant AI developments. The app uses a restrained black-and-white editorial interface and an offline-first archive.
 
-## Implemented in this source version
+## Current capabilities
 
-- Native Android app: Kotlin + Jetpack Compose; min SDK 26.
-- Daily background fetch scheduled with WorkManager (24-hour periodic interval; Android may defer execution under Doze/battery restrictions).
-- RSS sources: OpenAI, Google AI, TechCrunch AI, Hugging Face, MIT Technology Review.
-- Deduplication by SHA-256 of canonical article URL.
-- SQLite local archive; entries older than 30 days are pruned.
-- Relevance keyword heuristic for launches, releases, research, safety, business and regulation; suppresses obvious opinion/promotional/how-to items. Items older than 10 days are excluded.
-- On-device English-to-Russian title and summary translation using Google ML Kit, with English fallback.
-- Android notifications for newly discovered qualifying items. Android 13+ requires notification permission.
-- Manual refresh button in the app.
+- Native Android application built with Kotlin and Jetpack Compose; min SDK 26.
+- Concurrent RSS/Atom collection from OpenAI, Google AI, TechCrunch AI, Hugging Face and MIT Technology Review.
+- Conservative relevance scoring, freshness filtering, canonical URL deduplication and near-duplicate headline suppression.
+- Deterministic editorial categories: Products, Research, Business, Safety, Regulation and Other.
+- On-device English-to-Russian translation with source-language fallback; no paid AI/API service is called.
+- SQLite archive with schema migration, indexed category/date/bookmark fields and retention of saved stories.
+- In-app search, category filters, relevance/newest sorting and persistent bookmarks.
+- Event Intelligence groups similar headlines across publishers while retaining separate source articles.
+- Breaking AI highlights recent high-impact announcements using transparent deterministic rules.
+- Source Evidence shows the number and names of publishers covering an event, with direct links to each report.
+- Initial background sync plus best-effort 24-hour WorkManager refresh.
+- Notifications for newly discovered qualifying stories, subject to Android notification permission.
+- Manual refresh and direct links to publisher sources.
 
-## Limitations
+## Editorial and technical boundaries
 
-1. RSS endpoint availability and feed formats must be validated on physical devices; publishers can change feed URLs or markup.
-2. Significance ranking is a deterministic keyword heuristic, not semantic LLM analysis or independent fact-checking. Production editorial quality should add event clustering, semantic ranking, source cross-checking and factual verification.
-3. If the ML Kit translation model cannot be downloaded, original English titles/summaries remain visible. Full articles open at the publisher and may remain in the publisher's language.
-4. Background work is periodic and best-effort. Android does not guarantee execution at an exact wall-clock time every 24 hours.
-5. This repository currently builds a debug APK, not a signed production release.
+- Event clustering, breaking detection, significance ranking and category assignment use deterministic heuristics; they are not LLM reasoning or independent fact-checking.
+- Publisher count is an evidence signal only. It does not establish editorial independence, source quality, truth, or factual verification. Readers must inspect the linked original reports.
+- Feed availability, publisher markup and publication-date formats can change. RSS results must be monitored against real devices and live feeds.
+- Translation runs on-device after the ML Kit model is available. Original English text is retained when translation is unavailable or blank.
+- WorkManager periodic execution is best-effort; Android may defer it under Doze and battery restrictions.
+- Full articles open on publisher websites and may remain in their original language.
+- GitHub Actions currently builds a debug APK; this is not a signed production release.
 
 ## Build
 
@@ -32,4 +38,4 @@ gradle --no-daemon :app:assembleDebug
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`.
 
-GitHub Actions builds the debug APK on every push to `main` or `master` and stores it as the `photon-ai-news-debug-apk` workflow artifact.
+GitHub Actions builds the debug APK on branch pushes and pull requests targeting main/master. The artifact is named `photon-ai-news-debug-apk`.
