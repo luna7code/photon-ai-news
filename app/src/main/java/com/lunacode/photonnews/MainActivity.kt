@@ -39,6 +39,8 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lunacode.photonnews.data.NewsEvent
+import com.lunacode.photonnews.data.EditorialAssessment
+import com.lunacode.photonnews.data.EditorialIntelligenceV3
 import com.lunacode.photonnews.data.NewsIntelligence
 import com.lunacode.photonnews.data.NewsItem
 import com.lunacode.photonnews.data.NewsRepository
@@ -93,7 +95,8 @@ private val sections = listOf(
     "FEED" to "Лента",
     "EVENTS" to "События",
     "BREAKING" to "Срочно",
-    "SOURCES" to "Источники"
+    "SOURCES" to "Источники",
+    "IMPACT" to "Влияние"
 )
 
 private fun categoryLabel(category: String): String = when (category) {
@@ -121,6 +124,7 @@ private fun PhotonApp() {
     var lastUpdate by remember { mutableLongStateOf(prefs.getLong("last_update", 0L)) }
 
     val events = remember(news) { NewsIntelligence.buildEvents(news) }
+    val assessments = remember(events) { events.associate { it.id to EditorialIntelligenceV3.assess(it) } }
     val visibleNews = remember(news, query, selectedCategory, savedOnly, newestFirst) {
         val filtered = news.filter { item ->
             (selectedCategory == "ALL" || item.category == selectedCategory) &&
@@ -131,13 +135,14 @@ private fun PhotonApp() {
         if (newestFirst) filtered.sortedByDescending { it.publishedAt }
         else filtered.sortedWith(compareByDescending<NewsItem> { it.score }.thenByDescending { it.publishedAt })
     }
-    val visibleEvents = remember(events, query, selectedSection) {
+    val visibleEvents = remember(events, assessments, query, selectedSection) {
         val filtered = events.filter { event ->
             query.isBlank() || listOf(event.headline, event.summary, event.publishers.joinToString(" "))
                 .any { it.contains(query.trim(), ignoreCase = true) }
         }
         when (selectedSection) {
-            "BREAKING" -> filtered.filter { it.isBreaking }
+            "BREAKING" -> filtered.filter { assessments[it.id]?.isGlobalBreaking == true }
+            "IMPACT" -> filtered.sortedByDescending { assessments[it.id]?.impactScore ?: 0 }
             "SOURCES" -> filtered
             else -> filtered
         }
@@ -289,14 +294,15 @@ private fun PhotonApp() {
                 } else {
                     Spacer(Modifier.height(8.dp))
                     val count = when (selectedSection) {
-                        "BREAKING" -> visibleEvents.count { it.isBreaking }
+                        "BREAKING" -> visibleEvents.count { assessments[it.id]?.isGlobalBreaking == true }
                         else -> visibleEvents.size
                     }
                     Text(
                         when (selectedSection) {
                             "EVENTS" -> "$count сгруппированных событий"
-                            "BREAKING" -> "$count срочных событий"
-                            else -> "$count событий · оценка по публикациям издателей"
+                            "BREAKING" -> "$count глобальных срочных событий"
+                            "IMPACT" -> "$count событий · рейтинг влияния"
+                            else -> "$count событий · семантическая группировка"
                         },
                         color = Muted, fontSize = 11.sp
                     )
@@ -318,7 +324,7 @@ private fun PhotonApp() {
                     selectedSection == "FEED" && visibleNews.isEmpty() ->
                         EmptyState(if (savedOnly) "Нет сохранённых новостей" else "Ничего не найдено")
                     selectedSection != "FEED" && visibleEvents.isEmpty() ->
-                        EmptyState(if (selectedSection == "BREAKING") "Срочных событий пока нет" else "События не найдены")
+                        EmptyState(if (selectedSection == "BREAKING") "Глобальных срочных событий пока нет" else "События не найдены")
                     selectedSection == "FEED" -> {
                         LazyColumn(contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                             items(visibleNews, key = { it.id }) { item ->
@@ -332,7 +338,12 @@ private fun PhotonApp() {
                     else -> {
                         LazyColumn(contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                             items(visibleEvents, key = { it.id }) { event ->
-                                EventCard(event = event, showSourceEvidence = selectedSection == "SOURCES")
+                                EventCard(
+                                    event = event,
+                                    assessment = assessments[event.id],
+                                    showSourceEvidence = selectedSection == "SOURCES",
+                                    showImpact = selectedSection == "IMPACT"
+                                )
                             }
                         }
                     }
@@ -392,7 +403,12 @@ private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
 }
 
 @Composable
-private fun EventCard(event: NewsEvent, showSourceEvidence: Boolean) {
+private fun EventCard(
+    event: NewsEvent,
+    assessment: EditorialAssessment?,
+    showSourceEvidence: Boolean,
+    showImpact: Boolean
+) {
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -414,6 +430,43 @@ private fun EventCard(event: NewsEvent, showSourceEvidence: Boolean) {
             Text(event.summary, color = Color(0xFFB0B0B0), fontSize = 12.sp, lineHeight = 18.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.height(11.dp))
+        assessment?.let { result ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("SEMANTIC ${result.semanticConfidence}%", color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp)
+                Text("SOURCE DATA ${result.sourceTrust.score}/100", color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp)
+                if (showImpact) {
+                    Text("IMPACT ${result.impactScore}/100", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Text(
+                "${result.sourceTrust.label} · ${result.sourceTrust.distinctHostCount} доменов",
+                color = Color(0xFFBDBDBD), fontSize = 10.sp, lineHeight = 14.sp
+            )
+            Text(
+                result.sourceTrust.explanation,
+                color = Color(0xFF777777), fontSize = 9.sp, lineHeight = 13.sp
+            )
+            if (result.factConflicts.isNotEmpty()) {
+                Spacer(Modifier.height(7.dp))
+                Text("ВОЗМОЖНЫЕ РАСХОЖДЕНИЯ", color = Color.White, fontSize = 9.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold)
+                result.factConflicts.forEach { conflict ->
+                    Text(
+                        "${conflict.description} · ${conflict.sources.joinToString(", ")}",
+                        color = Color(0xFFBDBDBD), fontSize = 10.sp, lineHeight = 14.sp
+                    )
+                }
+            }
+        }
+        Text(
+            if (assessment?.isGlobalBreaking == true) "GLOBAL BREAKING · высокий приоритет"
+            else if (event.isBreaking) "Срочное событие · локальная эвристика"
+            else "Редакционная оценка · автоматический анализ",
+            color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp
+        )
         Text(
             "ИЗДАТЕЛЕЙ: ${event.publisherCount}",
             color = Color.White, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold

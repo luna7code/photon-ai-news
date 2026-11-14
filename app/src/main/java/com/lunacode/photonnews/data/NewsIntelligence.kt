@@ -44,7 +44,7 @@ object NewsIntelligence {
         val clusters = mutableListOf<MutableList<NewsItem>>()
         items.sortedByDescending { it.publishedAt }.forEach { item ->
             val matching = clusters.firstOrNull { cluster ->
-                cluster.any { headlineSimilarity(it.title, item.title) >= 0.38 }
+                cluster.any { SemanticIntelligence.similarity(it.title, item.title) >= 0.42 }
             }
             if (matching == null) clusters += mutableListOf(item) else matching += item
         }
