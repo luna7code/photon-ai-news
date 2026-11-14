@@ -24,6 +24,15 @@ object E5ModelAssets {
     private const val MODEL_MAX_BYTES = 520L * 1024 * 1024
     private const val TOKENIZER_MAX_BYTES = 25L * 1024 * 1024
 
+    fun existing(context: Context): E5ModelFiles? {
+        val directory = File(context.filesDir, "models/multilingual-e5-small")
+        val model = File(directory, "model.onnx")
+        val tokenizer = File(directory, "tokenizer.json")
+        return if (model.isFile && model.length() > 0L && tokenizer.isFile && tokenizer.length() > 0L) {
+            E5ModelFiles(model, tokenizer)
+        } else null
+    }
+
     suspend fun install(context: Context): E5ModelFiles = withContext(Dispatchers.IO) {
         val directory = File(context.filesDir, "models/multilingual-e5-small")
         if (!directory.exists() && !directory.mkdirs()) {
