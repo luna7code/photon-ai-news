@@ -169,7 +169,16 @@ Do not rename or relocate existing application classes as part of this work. Kee
 
 - [ ] **Step 3: Extract and implement file-integrity verification.**
 
-  Add a small internal helper in `E5ModelAssets.kt` with explicit `File` and expected-SHA inputs. Make `existing(context)` verify both pinned hashes, not merely file existence and nonzero length.
+  Add this pure helper in `E5ModelAssets.kt` and keep its API stable for unit tests:
+
+  ```kotlin
+  internal object ModelFileIntegrity {
+      fun sha256(file: File): String
+      fun matches(file: File, expectedSha256: String): Boolean
+  }
+  ```
+
+  Make `E5ModelAssets.existing(context): E5ModelFiles?` verify both pinned hashes, not merely file existence and nonzero length. Test names: `acceptsExpectedSha256`, `rejectsModifiedFile`, `rejectsEmptyFile` and `rejectsTruncatedFile`.
 
 - [ ] **Step 4: Preserve safe installation semantics.**
 
@@ -213,7 +222,18 @@ Do not rename or relocate existing application classes as part of this work. Kee
 
 - [ ] **Step 3: Implement a pure output validator/pooling helper.**
 
-  Define one internal helper with explicit hidden-state and attention-mask inputs. Enforce the exact 384-dimensional contract and validate every token vector before pooling. Keep the existing E5 `passage:` prefix, 512-token cap, attention-mask pooling and L2 normalization.
+  Define this pure helper in `MultilingualE5Embedder.kt` and keep its API stable for unit tests:
+
+  ```kotlin
+  internal object EmbeddingOutputValidator {
+      fun poolAndNormalize(
+          hidden: Array<Array<FloatArray>>,
+          attentionMask: LongArray
+      ): FloatArray
+  }
+  ```
+
+  Enforce batch size 1, token-count/mask alignment, exactly 384 dimensions per token, finite values and a nonzero finite norm. Keep the existing E5 `passage:` prefix, 512-token cap, attention-mask pooling and L2 normalization. Test names: `poolsAndNormalizes384DimensionalEmbeddings`, `ignoresMaskedPaddingTokens`, `rejectsWrongEmbeddingDimension`, `rejectsWrongTokenCount`, `rejectsMismatchedMask`, `rejectsNonFiniteValues` and `rejectsZeroNorm`.
 
 - [ ] **Step 4: Integrate validation into inference.**
 
@@ -244,7 +264,7 @@ Do not rename or relocate existing application classes as part of this work. Kee
 
 - [ ] **Step 2: Implement an on-device smoke test.**
 
-  The test must require an already installed, SHA-verified E5 model; it must not silently download a 118 MB model during a normal CI run. On the device, initialize `SemanticModelRegistry`, run Russian and English inputs, verify finite 384-dimensional embeddings and bounded cosine similarity, then close the registry in a `finally` block.
+  The test must require an already installed, SHA-verified E5 model; it must not silently download a 118 MB model during a normal CI run. Add test methods `e5ProducesFinite384DimensionalRussianAndEnglishEmbeddings` and `reportsShortTextLatencyPercentiles`. On the device, initialize `SemanticModelRegistry`, run Russian and English inputs, verify finite 384-dimensional embeddings and bounded cosine similarity, then close the registry in a `finally` block.
 
 - [ ] **Step 3: Implement repeatable latency sampling.**
 
@@ -312,7 +332,7 @@ Do not rename or relocate existing application classes as part of this work. Kee
 
 - [ ] **Step 1: Add secret-safe Gradle signing configuration.**
 
-  Read keystore path, store password, alias and key password only from environment variables. Keep debug builds independent of these values. Do not write credentials to source files, `gradle.properties`, build outputs or logs.
+  Read these exact environment variables in Gradle: `PHOTON_KEYSTORE_PATH`, `PHOTON_KEYSTORE_PASSWORD`, `PHOTON_KEY_ALIAS` and `PHOTON_KEY_PASSWORD`. The workflow maps the decoded temporary file path to `PHOTON_KEYSTORE_PATH`; the other three values come from same-named GitHub Environment secrets. Keep debug builds independent of these values. Do not write credentials to source files, `gradle.properties`, build outputs or logs.
 
 - [ ] **Step 2: Add local secret-file protections.**
 
