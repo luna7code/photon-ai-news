@@ -20,7 +20,7 @@ data class FactConflict(
 )
 
 data class EditorialAssessment(
-    val semanticConfidence: Int,
+    val semanticSimilarity: Int,
     val sourceTrust: SourceTrustAssessment,
     val factConflicts: List<FactConflict>,
     val impactScore: Int,
@@ -40,7 +40,10 @@ object SemanticIntelligence {
      * The lexical score is a deliberately labelled fallback, not semantic inference.
      */
     fun similarity(first: String, second: String): Double =
-        SemanticModelRegistry.similarity(first, second) ?: lexicalSimilarity(first, second)
+        SemanticModelRegistry.similarity(first, second)?.coerceIn(0.0, 1.0)
+            ?: lexicalSimilarity(first, second)
+
+    fun clusteringThreshold(): Double = if (SemanticModelRegistry.isReady()) 0.72 else 0.42
 
     fun lexicalSimilarity(first: String, second: String): Double {
         val a = tokens(first)
@@ -53,7 +56,7 @@ object SemanticIntelligence {
         return (jaccard * 0.65 + containment * 0.35).coerceIn(0.0, 1.0)
     }
 
-    fun confidence(articles: List<NewsItem>): Int {
+    fun similarityScore(articles: List<NewsItem>): Int {
         if (articles.size < 2) return 0
         val pairScores = mutableListOf<Double>()
         val sample = articles.take(12)
@@ -258,7 +261,7 @@ object EditorialIntelligenceV3 {
     fun assess(event: NewsEvent, now: Long = System.currentTimeMillis()): EditorialAssessment {
         val impact = ImpactRanking.score(event, now)
         return EditorialAssessment(
-            semanticConfidence = SemanticIntelligence.confidence(event.articles),
+            semanticSimilarity = SemanticIntelligence.similarityScore(event.articles),
             sourceTrust = SourceTrustEngine.assess(event.articles),
             factConflicts = FactCrossCheck.findPotentialConflicts(event.articles),
             impactScore = impact,
