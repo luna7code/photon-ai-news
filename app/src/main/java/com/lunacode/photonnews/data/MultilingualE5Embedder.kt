@@ -88,12 +88,8 @@ class MultilingualE5Embedder(files: E5ModelFiles) : Closeable {
     }
 
     @Synchronized
-    fun similarity(first: String, second: String): Double {
-        val a = embed(first)
-        val b = embed(second)
-        if (a.size != b.size) return 0.0
-        return a.indices.sumOf { a[it].toDouble() * b[it].toDouble() }.coerceIn(-1.0, 1.0)
-    }
+    fun similarity(first: String, second: String): Double =
+        EmbeddingMath.cosineSimilarity(embed(first), embed(second))
 
     override fun close() {
         tokenizer.close()
@@ -120,5 +116,16 @@ object SemanticModelRegistry {
     fun shutdown() {
         active?.close()
         active = null
+    }
+}
+
+object EmbeddingMath {
+    fun cosineSimilarity(first: FloatArray, second: FloatArray): Double {
+        if (first.isEmpty() || first.size != second.size) return 0.0
+        val dot = first.indices.sumOf { first[it].toDouble() * second[it].toDouble() }
+        val firstNorm = kotlin.math.sqrt(first.sumOf { (it * it).toDouble() })
+        val secondNorm = kotlin.math.sqrt(second.sumOf { (it * it).toDouble() })
+        if (firstNorm == 0.0 || secondNorm == 0.0) return 0.0
+        return (dot / (firstNorm * secondNorm)).coerceIn(-1.0, 1.0)
     }
 }
