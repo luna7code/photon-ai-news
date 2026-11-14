@@ -207,7 +207,7 @@ private fun PhotonApp() {
     fun installSemanticModel() {
         if (semanticModelDownloading || semanticModelReady) return
         semanticModelDownloading = true
-        status = "Загрузка multilingual E5 (~118 МБ). Не закрывайте приложение…"
+        status = "Загрузка multilingual E5 (~135 МБ вместе с токенизатором). Не закрывайте приложение…"
         (context as? ComponentActivity)?.lifecycleScope?.launch {
             try {
                 val files = E5ModelAssets.install(context)
@@ -309,7 +309,7 @@ private fun PhotonApp() {
                                 Text("Загрузка…", color = Color.White, fontSize = 10.sp)
                             } else {
                                 Text(
-                                    if (semanticModelReady) "Модель активна" else "Установить AI · 118 МБ",
+                                    if (semanticModelReady) "Модель активна" else "Установить AI · 135 МБ",
                                     color = Color.White, fontSize = 10.sp
                                 )
                             }
