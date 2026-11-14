@@ -38,6 +38,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.lunacode.photonnews.data.NewsEvent
+import com.lunacode.photonnews.data.NewsIntelligence
 import com.lunacode.photonnews.data.NewsItem
 import com.lunacode.photonnews.data.NewsRepository
 import com.lunacode.photonnews.data.NewsStore
@@ -50,6 +52,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+private val Background = Color(0xFF080808)
+private val Panel = Color(0xFF151515)
+private val Muted = Color(0xFF929292)
+
 class MainActivity : ComponentActivity() {
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -57,7 +63,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         scheduleDailySync()
-        if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT >= 33) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         setContent { PhotonApp() }
     }
 
@@ -69,7 +77,6 @@ class MainActivity : ComponentActivity() {
             "photon_daily_news", ExistingPeriodicWorkPolicy.KEEP, request
         )
     }
-
 }
 
 private val categories = listOf(
@@ -80,6 +87,13 @@ private val categories = listOf(
     "SAFETY" to "Безопасность",
     "POLICY" to "Регулирование",
     "OTHER" to "Другие"
+)
+
+private val sections = listOf(
+    "FEED" to "Лента",
+    "EVENTS" to "События",
+    "BREAKING" to "Срочно",
+    "SOURCES" to "Источники"
 )
 
 private fun categoryLabel(category: String): String = when (category) {
@@ -100,11 +114,13 @@ private fun PhotonApp() {
     var status by remember { mutableStateOf("Умная лента готова к обновлению") }
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("ALL") }
+    var selectedSection by remember { mutableStateOf("FEED") }
     var savedOnly by remember { mutableStateOf(false) }
     var newestFirst by remember { mutableStateOf(false) }
     val prefs = remember { context.getSharedPreferences("photon", 0) }
     var lastUpdate by remember { mutableLongStateOf(prefs.getLong("last_update", 0L)) }
 
+    val events = remember(news) { NewsIntelligence.buildEvents(news) }
     val visibleNews = remember(news, query, selectedCategory, savedOnly, newestFirst) {
         val filtered = news.filter { item ->
             (selectedCategory == "ALL" || item.category == selectedCategory) &&
@@ -114,6 +130,17 @@ private fun PhotonApp() {
         }
         if (newestFirst) filtered.sortedByDescending { it.publishedAt }
         else filtered.sortedWith(compareByDescending<NewsItem> { it.score }.thenByDescending { it.publishedAt })
+    }
+    val visibleEvents = remember(events, query, selectedSection) {
+        val filtered = events.filter { event ->
+            query.isBlank() || listOf(event.headline, event.summary, event.publishers.joinToString(" "))
+                .any { it.contains(query.trim(), ignoreCase = true) }
+        }
+        when (selectedSection) {
+            "BREAKING" -> filtered.filter { it.isBreaking }
+            "SOURCES" -> filtered
+            else -> filtered
+        }
     }
 
     fun reload() {
@@ -134,7 +161,7 @@ private fun PhotonApp() {
                 news = result
                 lastUpdate = System.currentTimeMillis()
                 prefs.edit().putLong("last_update", lastUpdate).apply()
-                status = "Обновлено · " + result.size + " публикаций в архиве"
+                status = "Обновлено · ${result.size} публикаций в архиве"
             } catch (_: Exception) {
                 status = "Не удалось обновить ленту. Проверьте подключение и повторите попытку."
             } finally {
@@ -147,13 +174,12 @@ private fun PhotonApp() {
         if (news.isEmpty()) refresh()
     }
 
-
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Color.White, onPrimary = Color.Black,
-        background = Color(0xFF080808), surface = Color(0xFF151515),
+        background = Background, surface = Panel,
         onSurface = Color.White, secondary = Color(0xFFC2C2C2)
     )) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF080808)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                 Spacer(Modifier.height(24.dp))
                 Row(
@@ -169,6 +195,7 @@ private fun PhotonApp() {
                         TextButton(onClick = {
                             savedOnly = !savedOnly
                             selectedCategory = "ALL"
+                            selectedSection = "FEED"
                         }) {
                             Icon(if (savedOnly) Icons.Default.Bookmark else Icons.Default.BookmarkBorder, null, tint = Color.White)
                             Spacer(Modifier.width(5.dp))
@@ -191,11 +218,30 @@ private fun PhotonApp() {
                 Spacer(Modifier.height(5.dp))
                 Text(
                     "Главные события искусственного интеллекта — без информационного шума.",
-                    color = Color(0xFF9D9D9D), fontSize = 13.sp, lineHeight = 19.sp
+                    color = Muted, fontSize = 13.sp, lineHeight = 19.sp
                 )
                 Spacer(Modifier.height(12.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    items(sections) { section ->
+                        FilterChip(
+                            selected = selectedSection == section.first,
+                            onClick = {
+                                selectedSection = section.first
+                                savedOnly = false
+                            },
+                            label = { Text(section.second, fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color.White,
+                                selectedLabelColor = Color.Black,
+                                containerColor = Color(0xFF1B1B1B),
+                                labelColor = Color(0xFFBDBDBD)
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF151515), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 11.dp),
+                    Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.Search, null, tint = Color(0xFF888888), modifier = Modifier.size(18.dp))
@@ -213,35 +259,49 @@ private fun PhotonApp() {
                         TextButton(onClick = { query = "" }) { Text("Очистить", color = Color.LightGray) }
                     }
                 }
+                if (selectedSection == "FEED") {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("${visibleNews.size} новостей", color = Muted, fontSize = 11.sp)
+                        TextButton(onClick = { newestFirst = !newestFirst }) {
+                            Text(if (newestFirst) "Сначала новые" else "Сначала важные", color = Color(0xFFCCCCCC), fontSize = 11.sp)
+                        }
+                    }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        items(categories) { category ->
+                            FilterChip(
+                                selected = selectedCategory == category.first,
+                                onClick = { selectedCategory = category.first; savedOnly = false },
+                                label = { Text(category.second, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color.White,
+                                    selectedLabelColor = Color.Black,
+                                    containerColor = Color(0xFF1B1B1B),
+                                    labelColor = Color(0xFFBDBDBD)
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.height(8.dp))
+                    val count = when (selectedSection) {
+                        "BREAKING" -> visibleEvents.count { it.isBreaking }
+                        else -> visibleEvents.size
+                    }
+                    Text(
+                        when (selectedSection) {
+                            "EVENTS" -> "$count сгруппированных событий"
+                            "BREAKING" -> "$count срочных событий"
+                            else -> "$count событий · оценка по публикациям издателей"
+                        },
+                        color = Muted, fontSize = 11.sp
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(visibleNews.size.toString() + " новостей", color = Color(0xFF888888), fontSize = 11.sp)
-                    TextButton(onClick = { newestFirst = !newestFirst }) {
-                        Text(if (newestFirst) "Сначала новые" else "Сначала важные", color = Color(0xFFCCCCCC), fontSize = 11.sp)
-                    }
-                }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    items(categories) { category ->
-                        val id = category.first
-                        val label = category.second
-                        FilterChip(
-                            selected = selectedCategory == id,
-                            onClick = { selectedCategory = id; savedOnly = false },
-                            label = { Text(label, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color.White,
-                                selectedLabelColor = Color.Black,
-                                containerColor = Color(0xFF1B1B1B),
-                                labelColor = Color(0xFFBDBDBD)
-                            ),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(6.dp).background(Color(0xFFBDBDBD), RoundedCornerShape(50)))
                     Spacer(Modifier.width(7.dp))
@@ -254,24 +314,26 @@ private fun PhotonApp() {
                     )
                 }
                 HorizontalDivider(color = Color(0xFF292929), modifier = Modifier.padding(top = 12.dp))
-                if (visibleNews.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                if (savedOnly) "Нет сохранённых новостей" else "Ничего не найдено",
-                                color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(7.dp))
-                            Text("Измените фильтр или обновите ленту.", color = Color(0xFF888888), fontSize = 12.sp)
+                when {
+                    selectedSection == "FEED" && visibleNews.isEmpty() ->
+                        EmptyState(if (savedOnly) "Нет сохранённых новостей" else "Ничего не найдено")
+                    selectedSection != "FEED" && visibleEvents.isEmpty() ->
+                        EmptyState(if (selectedSection == "BREAKING") "Срочных событий пока нет" else "События не найдены")
+                    selectedSection == "FEED" -> {
+                        LazyColumn(contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                            items(visibleNews, key = { it.id }) { item ->
+                                NewsCard(item = item, onBookmark = {
+                                    store.setSaved(item.id, !item.isSaved)
+                                    reload()
+                                })
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                        items(visibleNews, key = { it.id }) { item ->
-                            NewsCard(item = item, onBookmark = {
-                                store.setSaved(item.id, !item.isSaved)
-                                reload()
-                            })
+                    else -> {
+                        LazyColumn(contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                            items(visibleEvents, key = { it.id }) { event ->
+                                EventCard(event = event, showSourceEvidence = selectedSection == "SOURCES")
+                            }
                         }
                     }
                 }
@@ -281,11 +343,20 @@ private fun PhotonApp() {
 }
 
 @Composable
+private fun EmptyState(title: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(7.dp))
+            Text("Измените фильтр или обновите ленту.", color = Muted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
 private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
     val context = LocalContext.current
-    Column(
-        Modifier.fillMaxWidth().background(Color(0xFF151515), RoundedCornerShape(15.dp)).padding(15.dp)
-    ) {
+    Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(item.source.uppercase(Locale.ROOT), color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
@@ -307,7 +378,7 @@ private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
         }
         Spacer(Modifier.height(9.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(categoryLabel(item.category), color = Color(0xFF888888), fontSize = 9.sp, letterSpacing = 1.sp)
+            Text(categoryLabel(item.category), color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
             Spacer(Modifier.weight(1f))
             Text(
                 "ЧИТАТЬ ИСТОЧНИК  ↗", color = Color.White, fontSize = 9.sp, letterSpacing = 1.sp,
@@ -315,6 +386,58 @@ private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
                 modifier = Modifier.clickable {
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
                 }.padding(4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EventCard(event: NewsEvent, showSourceEvidence: Boolean) {
+    val context = LocalContext.current
+    Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (event.isBreaking) "СРОЧНО" else "СОБЫТИЕ",
+                color = if (event.isBreaking) Color.White else Muted,
+                fontSize = 9.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                SimpleDateFormat("dd MMM · HH:mm", Locale("ru")).format(Date(event.latestAt)),
+                color = Color(0xFF777777), fontSize = 9.sp
+            )
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(event.headline, color = Color.White, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold)
+        if (event.summary.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(event.summary, color = Color(0xFFB0B0B0), fontSize = 12.sp, lineHeight = 18.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(11.dp))
+        Text(
+            "ИЗДАТЕЛЕЙ: ${event.publisherCount}",
+            color = Color.White, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold
+        )
+        Text(event.publishers.joinToString(" · "), color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            event.verificationLabel,
+            color = if (event.publisherCount >= 2) Color(0xFFD8D8D8) else Color(0xFFAAAAAA),
+            fontSize = 11.sp, lineHeight = 16.sp
+        )
+        Text(
+            if (showSourceEvidence) "Сопоставление издателей — сигнал для проверки, не фактчекинг."
+            else "Количество публикаций не гарантирует независимость или истинность сообщений.",
+            color = Color(0xFF777777), fontSize = 10.sp, lineHeight = 14.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        event.articles.forEach { article ->
+            Text(
+                "↗ ${article.source}: открыть публикацию",
+                color = Color.White, fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth().clickable {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url))) }
+                }.padding(vertical = 5.dp)
             )
         }
     }
