@@ -82,6 +82,15 @@ private val categories = listOf(
     "OTHER" to "Другие"
 )
 
+private fun categoryLabel(category: String): String = when (category) {
+    "PRODUCT" -> "Продукт"
+    "RESEARCH" -> "Исследование"
+    "BUSINESS" -> "Бизнес"
+    "SAFETY" -> "Безопасность"
+    "POLICY" -> "Регулирование"
+    else -> "Общее"
+}
+
 @Composable
 private fun PhotonApp() {
     val context = LocalContext.current
@@ -298,7 +307,7 @@ private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
         }
         Spacer(Modifier.height(9.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(item.category, color = Color(0xFF888888), fontSize = 9.sp, letterSpacing = 1.sp)
+            Text(categoryLabel(item.category), color = Color(0xFF888888), fontSize = 9.sp, letterSpacing = 1.sp)
             Spacer(Modifier.weight(1f))
             Text(
                 "ЧИТАТЬ ИСТОЧНИК  ↗", color = Color.White, fontSize = 9.sp, letterSpacing = 1.sp,
