@@ -13,15 +13,15 @@ import java.security.MessageDigest
 data class E5ModelFiles(val model: File, val tokenizer: File)
 
 object E5ModelAssets {
-    const val MODEL_SIZE_LABEL = "470 MB"
-    private const val REVISION = "ccc66d3"
-    private const val MODEL_SHA256 = "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665"
+    const val MODEL_SIZE_LABEL = "118 MB"
+    private const val REVISION = "6a0d452"
+    private const val MODEL_SHA256 = "dd476dd0c2514e9b9be83aeb3853fac0763e0bdf4a71645407587d77c48a2d88"
     private const val TOKENIZER_SHA256 = "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
     private const val MODEL_URL =
-        "https://huggingface.co/intfloat/multilingual-e5-small/resolve/$REVISION/onnx/model.onnx"
+        "https://huggingface.co/intfloat/multilingual-e5-small/resolve/$REVISION/onnx/model_qint8_avx512_vnni.onnx"
     private const val TOKENIZER_URL =
         "https://huggingface.co/intfloat/multilingual-e5-small/resolve/$REVISION/tokenizer.json"
-    private const val MODEL_MAX_BYTES = 520L * 1024 * 1024
+    private const val MODEL_MAX_BYTES = 150L * 1024 * 1024
     private const val TOKENIZER_MAX_BYTES = 25L * 1024 * 1024
 
     fun existing(context: Context): E5ModelFiles? {
@@ -39,8 +39,8 @@ object E5ModelAssets {
         if (!directory.exists() && !directory.mkdirs()) {
             error("Не удалось создать каталог модели")
         }
-        require(directory.usableSpace >= 560L * 1024 * 1024) {
-            "Для установки модели требуется не менее 560 МБ свободного места"
+        require(directory.usableSpace >= 170L * 1024 * 1024) {
+            "Для установки модели требуется не менее 170 МБ свободного места"
         }
         val model = File(directory, "model.onnx")
         val tokenizer = File(directory, "tokenizer.json")
