@@ -28,7 +28,10 @@ object E5ModelAssets {
         val directory = File(context.filesDir, "models/multilingual-e5-small")
         val model = File(directory, "model.onnx")
         val tokenizer = File(directory, "tokenizer.json")
-        return if (model.isFile && model.length() > 0L && tokenizer.isFile && tokenizer.length() > 0L) {
+        return if (
+            ModelFileIntegrity.matches(model, MODEL_SHA256) &&
+            ModelFileIntegrity.matches(tokenizer, TOKENIZER_SHA256)
+        ) {
             E5ModelFiles(model, tokenizer)
         } else null
     }
@@ -50,7 +53,7 @@ object E5ModelAssets {
     }
 
     private fun ensureFile(file: File, url: String, expectedSha256: String, maxBytes: Long) {
-        if (file.isFile && sha256(file) == expectedSha256) return
+        if (ModelFileIntegrity.matches(file, expectedSha256)) return
         if (file.exists() && !file.delete()) error("Не удалось удалить повреждённый файл модели")
         val temporary = File(file.parentFile, file.name + ".part")
         if (temporary.exists()) temporary.delete()
@@ -66,7 +69,6 @@ object E5ModelAssets {
             require(code in 200..299) { "Сервер модели вернул HTTP $code" }
             val length = connection.contentLengthLong
             require(length <= 0L || length <= maxBytes) { "Файл модели превышает допустимый размер" }
-            val digest = MessageDigest.getInstance("SHA-256")
             var total = 0L
             BufferedInputStream(connection.inputStream).use { input ->
                 BufferedOutputStream(temporary.outputStream()).use { output ->
@@ -76,13 +78,13 @@ object E5ModelAssets {
                         if (count < 0) break
                         total += count
                         require(total <= maxBytes) { "Файл модели превышает допустимый размер" }
-                        digest.update(buffer, 0, count)
                         output.write(buffer, 0, count)
                     }
                 }
             }
-            val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            require(actual == expectedSha256) { "SHA-256 модели не совпадает: $actual" }
+            require(ModelFileIntegrity.matches(temporary, expectedSha256)) {
+                "SHA-256 модели не совпадает"
+            }
             require(temporary.renameTo(file)) { "Не удалось сохранить проверенную модель" }
         } catch (error: Exception) {
             temporary.delete()
@@ -92,16 +94,4 @@ object E5ModelAssets {
         }
     }
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
 }
