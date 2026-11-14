@@ -11,13 +11,17 @@ A Russian-language Android news reader focused on significant AI developments. T
 - On-device English-to-Russian translation with source-language fallback; no paid AI/API service is called.
 - SQLite archive with schema migration, indexed category/date/bookmark fields and retention of saved stories.
 - In-app search, category filters, relevance/newest sorting and persistent bookmarks.
+- Event Intelligence groups similar headlines across publishers while retaining separate source articles.
+- Breaking AI highlights recent high-impact announcements using transparent deterministic rules.
+- Source Evidence shows the number and names of publishers covering an event, with direct links to each report.
 - Initial background sync plus best-effort 24-hour WorkManager refresh.
 - Notifications for newly discovered qualifying stories, subject to Android notification permission.
 - Manual refresh and direct links to publisher sources.
 
 ## Editorial and technical boundaries
 
-- Significance ranking and category assignment are deterministic heuristics, not semantic LLM analysis or independent fact-checking.
+- Event clustering, breaking detection, significance ranking and category assignment use deterministic heuristics; they are not LLM reasoning or independent fact-checking.
+- Publisher count is an evidence signal only. It does not establish editorial independence, source quality, truth, or factual verification. Readers must inspect the linked original reports.
 - Feed availability, publisher markup and publication-date formats can change. RSS results must be monitored against real devices and live feeds.
 - Translation runs on-device after the ML Kit model is available. Original English text is retained when translation is unavailable or blank.
 - WorkManager periodic execution is best-effort; Android may defer it under Doze and battery restrictions.
