@@ -264,7 +264,7 @@ Do not rename or relocate existing application classes as part of this work. Kee
 
 - [ ] **Step 2: Implement an on-device smoke test.**
 
-  The test must require an already installed, SHA-verified E5 model; it must not silently download a 118 MB model during a normal CI run. Add test methods `e5ProducesFinite384DimensionalRussianAndEnglishEmbeddings` and `reportsShortTextLatencyPercentiles`. On the device, initialize `SemanticModelRegistry`, run Russian and English inputs, verify finite 384-dimensional embeddings and bounded cosine similarity, then close the registry in a `finally` block.
+  The test must require an already installed, SHA-verified E5 model; it must not silently download a 118 MB model during a normal CI run. Add test methods `e5ProducesFinite384DimensionalRussianAndEnglishEmbeddings` and `reportsShortTextLatencyPercentiles`. On the device, instantiate `MultilingualE5Embedder(files)` inside a `use` block, call `embed()` for Russian and English inputs, verify finite 384-dimensional embeddings and bounded cosine similarity, then close the embedder automatically. Also verify the registry integration path returns a non-null similarity after `SemanticModelRegistry.install(files)` and always call `SemanticModelRegistry.shutdown()` in `finally`.
 
 - [ ] **Step 3: Implement repeatable latency sampling.**
 
