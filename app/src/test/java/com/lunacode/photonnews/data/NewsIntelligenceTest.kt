@@ -38,7 +38,7 @@ class NewsIntelligenceTest {
     fun breakingEventRequiresRecentHighImpactSignal() {
         val now = System.currentTimeMillis()
         val events = NewsIntelligence.buildEvents(
-            listOf(article("OpenAI launches GPT-5 model for developers", "OpenAI", now, score = 12))
+            listOf(article("Critical security breach exposes customer data", "OpenAI", now, score = 12))
         )
 
         assertTrue(events.single().isBreaking)
@@ -48,7 +48,7 @@ class NewsIntelligenceTest {
     fun staleHighImpactStoryIsNotBreaking() {
         val old = System.currentTimeMillis() - 3L * 24 * 60 * 60 * 1000
         val events = NewsIntelligence.buildEvents(
-            listOf(article("OpenAI launches GPT-5 model for developers", "OpenAI", old, score = 12))
+            listOf(article("Critical security breach exposes customer data", "OpenAI", old, score = 12))
         )
 
         assertFalse(events.single().isBreaking)

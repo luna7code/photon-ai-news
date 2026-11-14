@@ -32,11 +32,11 @@ object NewsIntelligence {
     )
 
     private val breakingSignals = listOf(
-        "launches", "launched", "announces", "announced", "releases", "released",
-        "acquires", "acquired", "billion", "emergency", "breach", "lawsuit",
-        "ban", " запрещ", "запускает", "запустил", "объявил", "объявляет",
-        "выпустил", "представил", "приобрел", "миллиард", "суд", "запрет",
-        "утечка", "уязвимость", "авария"
+        "security breach", "data breach", "critical vulnerability", "zero-day",
+        "service outage", "emergency shutdown", "mass recall", "regulatory ban",
+        "major data leak", "компрометация данных", "утечка данных",
+        "критическая уязвимость", "уязвимость нулевого дня", "масштабный сбой",
+        "аварийное отключение", "экстренный запрет", "массовый отзыв"
     )
 
     fun buildEvents(items: List<NewsItem>): List<NewsEvent> {
@@ -44,7 +44,7 @@ object NewsIntelligence {
         val clusters = mutableListOf<MutableList<NewsItem>>()
         items.sortedByDescending { it.publishedAt }.forEach { item ->
             val matching = clusters.firstOrNull { cluster ->
-                cluster.any { SemanticIntelligence.similarity(it.title, item.title) >= 0.42 }
+                cluster.any { SemanticIntelligence.similarity(it.title, item.title) >= SemanticIntelligence.clusteringThreshold() }
             }
             if (matching == null) clusters += mutableListOf(item) else matching += item
         }
@@ -60,8 +60,9 @@ object NewsIntelligence {
                 val normalized = normalize(article.title)
                 breakingSignals.any { normalized.contains(it) }
             }
+            val now = System.currentTimeMillis()
             val breaking = strongSignal && cluster.any { it.score >= 9 } &&
-                latest >= System.currentTimeMillis() - 36L * 60 * 60 * 1000
+                latest in (now - 36L * 60 * 60 * 1000)..(now + 5L * 60 * 1000)
             val verification = when {
                 sources.size >= 3 -> "3+ издателя сообщают об этом событии"
                 sources.size == 2 -> "Есть публикации двух издателей"

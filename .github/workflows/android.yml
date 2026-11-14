@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "**" ]
   pull_request:
-    branches: [ main, master, "feature/ai-editorial-engine-v2" ]
+    branches: [ main, master, "feature/ai-editorial-engine-v2", "feature/editorial-intelligence-v3" ]
 concurrency:
   group: android-apk-build-${{ github.ref }}
   cancel-in-progress: true
