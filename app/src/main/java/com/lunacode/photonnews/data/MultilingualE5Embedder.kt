@@ -105,7 +105,9 @@ object SemanticModelRegistry {
 
     @Synchronized
     fun install(files: E5ModelFiles) {
-        active?.close()
+        val previous = active
+        active = null
+        previous?.close()
         active = MultilingualE5Embedder(files)
     }
 
