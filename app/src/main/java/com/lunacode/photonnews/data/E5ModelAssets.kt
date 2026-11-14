@@ -8,7 +8,6 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 data class E5ModelFiles(val model: File, val tokenizer: File)
 
