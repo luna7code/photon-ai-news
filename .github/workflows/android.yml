@@ -24,6 +24,8 @@ jobs:
           gradle-version: '8.9'
       - name: Verify Android theme resource
         run: test -f app/src/main/res/values/styles.xml && grep -q 'Theme.PhotonAINews' app/src/main/res/values/styles.xml
+      - name: Run editorial intelligence unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
