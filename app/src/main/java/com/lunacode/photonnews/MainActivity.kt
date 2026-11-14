@@ -215,7 +215,6 @@ private fun PhotonApp() {
                 semanticModelReady = true
                 status = "Мультиязычная AI-модель установлена и работает на устройстве."
             } catch (error: Exception) {
-                withContext(Dispatchers.IO) { E5ModelAssets.invalidate(context) }
                 status = "Не удалось установить AI-модель: ${error.message ?: "ошибка загрузки"}. Резервный анализ доступен."
             } finally {
                 semanticModelDownloading = false
