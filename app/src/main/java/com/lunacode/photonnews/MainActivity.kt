@@ -568,7 +568,7 @@ private fun EventCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SEMANTIC ${result.semanticConfidence}%", color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp)
+                Text("SIMILARITY ${result.semanticSimilarity}/100", color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp)
                 Text("SOURCE DATA ${result.sourceTrust.score}/100", color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp)
                 if (showImpact) {
                     Text("IMPACT ${result.impactScore}/100", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
