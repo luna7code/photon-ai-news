@@ -33,22 +33,13 @@ internal object ModelFileIntegrity {
             return false
         }
 
-        val expected = ByteArray(expectedSha256.length / 2) { index ->
-            expectedSha256.substring(index * 2, index * 2 + 2).toInt(16).toByte()
-        }
-        val actual = MessageDigest.getInstance("SHA-256").digestFile(file)
+        val expected = decodeHex(expectedSha256)
+        val actual = decodeHex(sha256(file))
         return MessageDigest.isEqual(actual, expected)
     }
 
-    private fun MessageDigest.digestFile(file: File): ByteArray {
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                update(buffer, 0, count)
-            }
+    private fun decodeHex(value: String): ByteArray =
+        ByteArray(value.length / 2) { index ->
+            value.substring(index * 2, index * 2 + 2).toInt(16).toByte()
         }
-        return digest()
-    }
 }
