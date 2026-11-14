@@ -111,6 +111,7 @@ object NewsRepository {
             setRequestProperty("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml")
         }
         try {
+            if (connection.responseCode !in 200..299) return emptyList()
             connection.inputStream.use { input ->
                 val parser = Xml.newPullParser().apply {
                     setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
