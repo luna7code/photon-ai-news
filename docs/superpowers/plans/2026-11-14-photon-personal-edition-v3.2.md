@@ -8,7 +8,7 @@
 
 **Tech Stack:** Android Gradle Plugin 8.7.3; Gradle 8.9; Kotlin 2.0.21; Java 17; Android SDK compile/target 35, minSdk 26; Jetpack Compose; ONNX Runtime Android 1.31.1; DJL Hugging Face Tokenizers 0.33.0; JUnit 4.13.2; GitHub Actions.
 
-**Spec:** Approved in the ChatGPT conversation on 2026-11-14: “PHOTON AI NEWS — Personal Edition, Design Specification v3.2”. The accepted requirements and thresholds are restated below so this plan can be executed independently. The design document has not yet been committed as a separate repository file.
+**Spec:** `docs/superpowers/specs/2026-11-14-photon-personal-edition-v3.2-design.md` (approved by the user on 2026-11-14).
 
 ## Global Constraints
 
