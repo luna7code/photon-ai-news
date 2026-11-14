@@ -39,12 +39,14 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lunacode.photonnews.data.NewsEvent
+import com.lunacode.photonnews.data.E5ModelAssets
 import com.lunacode.photonnews.data.EditorialAssessment
 import com.lunacode.photonnews.data.EditorialIntelligenceV3
 import com.lunacode.photonnews.data.NewsIntelligence
 import com.lunacode.photonnews.data.NewsItem
 import com.lunacode.photonnews.data.NewsRepository
 import com.lunacode.photonnews.data.NewsStore
+import com.lunacode.photonnews.data.SemanticModelRegistry
 import com.lunacode.photonnews.worker.NewsWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -122,9 +124,19 @@ private fun PhotonApp() {
     var newestFirst by remember { mutableStateOf(false) }
     val prefs = remember { context.getSharedPreferences("photon", 0) }
     var lastUpdate by remember { mutableLongStateOf(prefs.getLong("last_update", 0L)) }
+    var semanticModelReady by remember { mutableStateOf(SemanticModelRegistry.isReady()) }
+    var semanticModelDownloading by remember { mutableStateOf(false) }
+    var events by remember { mutableStateOf<List<NewsEvent>>(emptyList()) }
+    var assessments by remember { mutableStateOf<Map<String, EditorialAssessment>>(emptyMap()) }
 
-    val events = remember(news) { NewsIntelligence.buildEvents(news) }
-    val assessments = remember(events) { events.associate { it.id to EditorialIntelligenceV3.assess(it) } }
+    LaunchedEffect(news, semanticModelReady) {
+        events = withContext(Dispatchers.Default) { NewsIntelligence.buildEvents(news) }
+    }
+    LaunchedEffect(events) {
+        assessments = withContext(Dispatchers.Default) {
+            events.associate { it.id to EditorialIntelligenceV3.assess(it) }
+        }
+    }
     val visibleNews = remember(news, query, selectedCategory, savedOnly, newestFirst) {
         val filtered = news.filter { item ->
             (selectedCategory == "ALL" || item.category == selectedCategory) &&
@@ -176,7 +188,36 @@ private fun PhotonApp() {
     }
 
     LaunchedEffect(Unit) {
+        if (!semanticModelReady) {
+            val installed = withContext(Dispatchers.IO) { E5ModelAssets.existing(context) }
+            if (installed != null) {
+                runCatching {
+                    withContext(Dispatchers.Default) { SemanticModelRegistry.install(installed) }
+                    semanticModelReady = true
+                }.onFailure {
+                    status = "Локальная AI-модель не загрузилась. Используется резервный анализ."
+                }
+            }
+        }
         if (news.isEmpty()) refresh()
+    }
+
+    fun installSemanticModel() {
+        if (semanticModelDownloading || semanticModelReady) return
+        semanticModelDownloading = true
+        status = "Загрузка multilingual E5 (~470 МБ). Не закрывайте приложение…"
+        (context as? ComponentActivity)?.lifecycleScope?.launch {
+            try {
+                val files = E5ModelAssets.install(context)
+                withContext(Dispatchers.Default) { SemanticModelRegistry.install(files) }
+                semanticModelReady = true
+                status = "Мультиязычная AI-модель установлена и работает на устройстве."
+            } catch (error: Exception) {
+                status = "Не удалось установить AI-модель: ${error.message ?: "ошибка загрузки"}. Резервный анализ доступен."
+            } finally {
+                semanticModelDownloading = false
+            }
+        }
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
@@ -242,6 +283,35 @@ private fun PhotonApp() {
                                 labelColor = Color(0xFFBDBDBD)
                             )
                         )
+                    }
+                }
+                if (selectedSection != "FEED") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            if (semanticModelReady) "MULTILINGUAL E5 · ON-DEVICE"
+                            else "Лексический резервный анализ",
+                            color = if (semanticModelReady) Color.White else Muted,
+                            fontSize = 9.sp, letterSpacing = 1.sp
+                        )
+                        TextButton(
+                            onClick = { installSemanticModel() },
+                            enabled = !semanticModelReady && !semanticModelDownloading
+                        ) {
+                            if (semanticModelDownloading) {
+                                CircularProgressIndicator(Modifier.size(13.dp), strokeWidth = 1.5.dp, color = Color.White)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Загрузка…", color = Color.White, fontSize = 10.sp)
+                            } else {
+                                Text(
+                                    if (semanticModelReady) "Модель активна" else "Установить AI · 470 МБ",
+                                    color = Color.White, fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
