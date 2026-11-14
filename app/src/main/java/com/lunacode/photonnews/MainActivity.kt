@@ -35,9 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lunacode.photonnews.data.NewsItem
@@ -59,7 +57,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         scheduleDailySync()
-        enqueueInitialSync()
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent { PhotonApp() }
     }
@@ -73,14 +70,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun enqueueInitialSync() {
-        val request = OneTimeWorkRequestBuilder<NewsWorker>()
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .build()
-        WorkManager.getInstance(this).enqueueUniqueWork(
-            "photon_initial_news", ExistingWorkPolicy.KEEP, request
-        )
-    }
 }
 
 private val categories = listOf(
@@ -144,6 +133,11 @@ private fun PhotonApp() {
             }
         }
     }
+
+    LaunchedEffect(Unit) {
+        if (news.isEmpty()) refresh()
+    }
+
 
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Color.White, onPrimary = Color.Black,
@@ -235,10 +229,6 @@ private fun PhotonApp() {
                                 containerColor = Color(0xFF1B1B1B),
                                 labelColor = Color(0xFFBDBDBD)
                             ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true, selected = selectedCategory == id,
-                                borderColor = Color(0xFF333333), selectedBorderColor = Color.White
-                            )
                         )
                     }
                 }
