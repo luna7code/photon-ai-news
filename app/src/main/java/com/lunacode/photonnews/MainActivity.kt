@@ -443,6 +443,10 @@ private fun EventCard(
                 }
             }
             Text(
+                "${result.sourceTrust.label} · ${result.sourceTrust.distinctHostCount} доменов",
+                color = Color(0xFFBDBDBD), fontSize = 10.sp, lineHeight = 14.sp
+            )
+            Text(
                 result.sourceTrust.explanation,
                 color = Color(0xFF777777), fontSize = 9.sp, lineHeight = 13.sp
             )
