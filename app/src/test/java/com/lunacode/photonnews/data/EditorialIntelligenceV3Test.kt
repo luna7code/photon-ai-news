@@ -100,6 +100,23 @@ class EditorialIntelligenceV3Test {
         assertTrue(NewsIntelligence.buildEvents(listOf(critical)).first().isBreaking)
     }
 
+    @Test
+    fun editorialComposerKeepsSourceTraceAndDisclosesSinglePublisher() {
+        val single = article(
+            "OpenAI announces a new model",
+            "OpenAI",
+            "https://openai.com/news",
+            10
+        )
+        val event = NewsIntelligence.buildEvents(listOf(single)).first()
+        val draft = EditorialComposer.compose(event)
+        assertEquals(single.title, draft.headline)
+        assertTrue(draft.sources.any { it.url == single.url })
+        assertTrue(draft.caveats.any { it.contains("одном издателе") })
+        assertTrue(draft.method.contains("extractive evidence synthesis"))
+        assertTrue(draft.paragraphs.all { it == single.summary || it == single.title })
+    }
+
     private fun article(title: String, source: String, url: String, score: Int) = NewsItem(
         id = "$source-$score",
         title = title,
