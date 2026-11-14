@@ -33,12 +33,6 @@ object E5ModelAssets {
         } else null
     }
 
-    fun invalidate(context: Context) {
-        val directory = File(context.filesDir, "models/multilingual-e5-small")
-        File(directory, "model.onnx").delete()
-        File(directory, "tokenizer.json").delete()
-    }
-
     suspend fun install(context: Context): E5ModelFiles = withContext(Dispatchers.IO) {
         existing(context)?.let { return@withContext it }
         val directory = File(context.filesDir, "models/multilingual-e5-small")
