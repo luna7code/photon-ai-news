@@ -34,9 +34,13 @@ object E5ModelAssets {
     }
 
     suspend fun install(context: Context): E5ModelFiles = withContext(Dispatchers.IO) {
+        existing(context)?.let { return@withContext it }
         val directory = File(context.filesDir, "models/multilingual-e5-small")
         if (!directory.exists() && !directory.mkdirs()) {
             error("Не удалось создать каталог модели")
+        }
+        require(directory.usableSpace >= 560L * 1024 * 1024) {
+            "Для установки модели требуется не менее 560 МБ свободного места"
         }
         val model = File(directory, "model.onnx")
         val tokenizer = File(directory, "tokenizer.json")
