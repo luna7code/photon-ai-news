@@ -40,6 +40,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lunacode.photonnews.data.NewsEvent
 import com.lunacode.photonnews.data.E5ModelAssets
+import com.lunacode.photonnews.data.EditorialComposer
+import com.lunacode.photonnews.data.EditorialDraft
 import com.lunacode.photonnews.data.EditorialAssessment
 import com.lunacode.photonnews.data.EditorialIntelligenceV3
 import com.lunacode.photonnews.data.NewsIntelligence
@@ -438,6 +440,16 @@ private fun EmptyState(title: String) {
 @Composable
 private fun NewsCard(item: NewsItem, onBookmark: () -> Unit) {
     val context = LocalContext.current
+    var showDraft by remember(event.id) { mutableStateOf(false) }
+    var draft by remember(event.id) { mutableStateOf<EditorialDraft?>(null) }
+    var draftLoading by remember(event.id) { mutableStateOf(false) }
+    LaunchedEffect(showDraft, event) {
+        if (showDraft && draft == null) {
+            draftLoading = true
+            draft = withContext(Dispatchers.Default) { EditorialComposer.compose(event) }
+            draftLoading = false
+        }
+    }
     Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(15.dp)).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(item.source.uppercase(Locale.ROOT), color = Color(0xFFBDBDBD), fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
@@ -499,6 +511,55 @@ private fun EventCard(
         if (event.summary.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(event.summary, color = Color(0xFFB0B0B0), fontSize = 12.sp, lineHeight = 18.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        }
+        TextButton(
+            onClick = { showDraft = !showDraft },
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)
+        ) {
+            Text(
+                if (showDraft) "СКРЫТЬ РЕДАКЦИОННЫЙ ЧЕРНОВИК" else "СОБРАТЬ РЕДАКЦИОННЫЙ ЧЕРНОВИК",
+                color = Color.White, fontSize = 9.sp, letterSpacing = 1.sp
+            )
+        }
+        if (showDraft) {
+            Column(
+                Modifier.fillMaxWidth().background(Color(0xFF202020), RoundedCornerShape(10.dp)).padding(11.dp)
+            ) {
+                if (draftLoading) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Собираем материалы…", color = Muted, fontSize = 11.sp)
+                    }
+                } else {
+                    draft?.let { editorial ->
+                        Text("ЧЕРНОВИК · НЕОБХОДИМА РЕДАКТОРСКАЯ ПРОВЕРКА", color = Color.White, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Spacer(Modifier.height(7.dp))
+                        Text(editorial.headline, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(5.dp))
+                        Text(editorial.lead, color = Color(0xFFD0D0D0), fontSize = 12.sp, lineHeight = 17.sp)
+                        editorial.paragraphs.drop(1).forEach { paragraph ->
+                            Spacer(Modifier.height(5.dp))
+                            Text(paragraph, color = Color(0xFFB0B0B0), fontSize = 11.sp, lineHeight = 16.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("ИСТОЧНИКИ", color = Color.White, fontSize = 9.sp, letterSpacing = 1.sp)
+                        editorial.sources.forEach { source ->
+                            Text(
+                                "↗ ${source.publisher} · открыть оригинал",
+                                color = Color(0xFFDDDDDD), fontSize = 10.sp,
+                                modifier = Modifier.clickable {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.url))) }
+                                }.padding(vertical = 3.dp)
+                            )
+                        }
+                        editorial.caveats.forEach { caveat ->
+                            Text("• $caveat", color = Color(0xFF999999), fontSize = 10.sp, lineHeight = 14.sp)
+                        }
+                        Text(editorial.method, color = Color(0xFF777777), fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp))
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(11.dp))
         assessment?.let { result ->
