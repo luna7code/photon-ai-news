@@ -54,10 +54,14 @@ object NewsRepository {
             .distinctBy { canonicalUrl(it.url) }
             .sortedWith(compareByDescending<NewsItem> { it.score }.thenByDescending { it.publishedAt })
 
-        // Remove near-identical headlines even when publishers use different URLs.
+        // Suppress repeated headlines from the same publisher, but retain cross-publisher
+        // coverage so NewsIntelligence can measure corroboration across distinct publishers.
         val unique = mutableListOf<NewsItem>()
         for (candidate in candidates) {
-            if (unique.none { headlineSimilarity(it.title, candidate.title) >= 0.82 }) {
+            if (unique.none {
+                    it.source == candidate.source &&
+                        headlineSimilarity(it.title, candidate.title) >= 0.82
+                }) {
                 unique += candidate
             }
         }
